@@ -1,0 +1,122 @@
+# =====================================================================
+# Unity Catalog Semantic Layer Definition
+# Compatible with: Databricks AI/BI Genie
+#
+# Schema:   demo.diamond
+# Tables:   sem_customer_transaction_summary
+#           sem_regional_monthly_aov
+# =====================================================================
+
+semantic_model:
+  name: databricks_demo_semantic_model
+  description: >
+    Semantic layer for the Databricks demo pipeline. Defines business-friendly
+    metrics and dimensions over the diamond layer tables, enabling natural language
+    querying via AI/BI Genie and structured access via MCP query functions.
+  catalog: demo
+  schema: diamond
+
+  tables:
+
+    # -----------------------------------------------------------------
+    # Table 1: sem_customer_transaction_summary
+    # Use case: Query customer transaction count and total revenue,
+    #           filterable by customer and month.
+    # -----------------------------------------------------------------
+    - name: sem_customer_transaction_summary
+      description: >
+        Per-customer monthly transaction summary. Each row represents one customer's
+        aggregated order activity within a calendar month. Supports filtering by
+        customer_id, customer_name, country, and order_month.
+
+      dimensions:
+        - name: customer_id
+          description: Unique identifier for the customer (e.g. C001)
+          type: string
+          primary_key: true
+
+        - name: customer_name
+          description: Full name of the customer
+          type: string
+
+        - name: country
+          description: >
+            Standardized country name of the customer.
+            Possible values: Taiwan, Japan, United States, Unknown.
+          type: string
+
+        - name: order_month
+          description: >
+            First day of the calendar month in which orders were placed
+            (e.g. 2025-01-01 represents January 2025).
+          type: timestamp
+
+      metrics:
+        - name: total_order_count
+          description: Total number of valid orders placed by the customer in the given month
+          type: integer
+          aggregation: sum
+
+        - name: total_order_amount
+          description: Total revenue (sum of order amounts) from the customer in the given month
+          type: double
+          aggregation: sum
+
+        - name: avg_order_value
+          description: >
+            Average order value (AOV) for the customer in the given month.
+            Calculated as total_order_amount / total_order_count.
+          type: double
+          aggregation: avg
+
+    # -----------------------------------------------------------------
+    # Table 2: sem_regional_monthly_aov
+    # Use case: Query AOV by region and month.
+    # -----------------------------------------------------------------
+    - name: sem_regional_monthly_aov
+      description: >
+        Regional monthly AOV (Average Order Value). Each row represents the
+        aggregated order metrics for one country in one calendar month.
+        Supports filtering by country and order_month.
+
+      dimensions:
+        - name: country
+          description: >
+            Standardized country / region name.
+            Possible values: Taiwan, Japan, United States, Unknown.
+          type: string
+
+        - name: order_month
+          description: >
+            First day of the calendar month (e.g. 2025-03-01 represents March 2025).
+          type: timestamp
+
+      metrics:
+        - name: total_order_count
+          description: Total number of valid orders across all customers in the region and month
+          type: integer
+          aggregation: sum
+
+        - name: total_order_amount
+          description: Total revenue across all customers in the region and month
+          type: double
+          aggregation: sum
+
+        - name: aov
+          description: >
+            Average Order Value for the region in the given month.
+            Calculated as total_order_amount / total_order_count.
+          type: double
+          aggregation: avg
+
+  # -----------------------------------------------------------------
+  # Sample questions for AI/BI Genie
+  # These help Genie understand how users will phrase queries.
+  # -----------------------------------------------------------------
+  sample_questions:
+    - "C001 客戶過去所有月份的交易次數和總金額是多少？"
+    - "幫我查 Taiwan 地區 2025 年 3 月的 AOV"
+    - "列出所有客戶 2025 年 1 月的交易總額，由高到低排序"
+    - "哪個國家的 AOV 最高？"
+    - "John Doe 和 Alex Smith 的累計交易次數比較"
+    - "2025 年第二季各地區的平均訂單金額趨勢"
