@@ -1,0 +1,51 @@
+﻿customer_id,customer_name,email,country,created_ts
+C001,John Doe,john.doe@email.com,Taiwan,2025/1/10 8:30
+C001,John Doe,john.new@email.com,TW,2025/2/15 9:15
+C002,Alex Smith,alex.smith@email.com,United States,2025/1/11 10:00
+C003,Tanaka Kenji,tanaka@email.com,Japan,2025/1/12 14:20
+C004,Emily Brown,emily.b@email.com,US,2025/1/15 11:05
+C005,Michael Chang,michael@email.com,tw,2025/1/18 16:45
+C006,Sato Emily,sato@email.com,JP,2025/1/20 9:00
+C007,David Wilson,david.w@email.com,USA,2025/1/22 13:10
+C008,Yuki Mori,,jp,2025/1/25 17:30
+C009,James Taylor,james.t@email.com,United States,2025/1/26 10:15
+C010,Lin Wei-Che,lin.wc@email.com,Taiwan,2025/1/28 11:40
+C011,Sarah Miller,sarah.m@email.com,,2025/2/1 15:20
+C012,Kato Hiroshi,kato@email.com,Japan,2025/2/3 14:00
+C013,Robert Jones,robert.j@email.com,US,2025/2/5 16:10
+C014,Chen Min,chenmin@email.com,TW,2025/2/8 9:50
+C015,Suzuki Ichiro,ichiro@email.com,Japan,2025/2/10 11:25
+C016,William Davis,william.d@email.com,United States,2025/2/12 13:00
+C017,Amanda Martinez,amanda.m_email.com,USA,2025/2/14 17:05
+C018,Tsai Meng-Hsun,tsai.mh@email.com,Taiwan,2025/2/18 10:30
+C019,Mary Garcia,mary.g@email.com,US,2025/2/20 14:15
+C020,Watanabe Sakura,sakura@email.com,jp,2025/2/22 16:40
+C021,Thomas Rodriguez,thomas.r@email.com,United States,2025/2/25 9:10
+C022,Huang Po-Han,huang.ph@email.com,tw,2025/2/27 11:55
+C023,Kimura Takuya,kimura@email.com,JP,2025/3/1 13:20
+C024,Nancy Lopez,nancy.l@email.com,US,2025/3/4 15:45
+C025,Charles Gonzalez,charles.g@email.com,USA,2025/3/6 10:00
+C026,Wu Shih-Ming,wu.sm@email.com,Taiwan,2025/3/9 14:30
+C027,Daniel Harris,daniel.h@email.com,United States,2025/3/12 16:10
+C028,Nakamura Ren,ren@email.com,Japan,2025/3/15 9:25
+C029,Patricia Clark,,US,2025/3/18 11:15
+C030,Kao Jui-Hsiang,kao.jh@email.com,TW,2025/3/20 13:40
+C031,Mark Lewis,mark.l@email.com,United States,2025/3/22 17:00
+C032,Saito Yuta,saito.y@email.com,jp,2025/3/25 10:50
+C033,Elizabeth Robinson,elizabeth@email.com,USA,2025/3/28 15:15
+C034,Hsu Chia-Ying,hsu.cy@email.com,tw,2025/4/1 14:00
+C035,Donald Walker,donald.w_email.com,US,2025/4/3 16:30
+C036,Yoshida Mai,mai.y@email.com,JP,2025/4/6 9:10
+C037,Steven Hall,steven.h@email.com,,2025/4/9 11:45
+C038,Lai Kuan-Yu,lai.ky@email.com,Taiwan,2025/4/12 13:20
+C039,Barbara Allen,barbara@email.com,United States,2025/4/15 15:55
+C040,Yamada Taro,yamada@email.com,Japan,2025/4/18 10:05
+C041,Paul Young,paul.y@email.com,US,2025/4/20 14:40
+C042,Chang Yu-Ting,chang.yt@email.com,TW,2025/4/22 16:15
+C043,Betty Hernandez,betty.h@email.com,USA,2025/4/25 9:30
+C044,Kobayashi Yuka,yuka@email.com,jp,2025/4/27 11:20
+C045,George King,george.k@email.com,United States,2025/5/1 13:00
+C045,George King,george.updated@email.com,US,2025/5/10 15:00
+C046,Hsieh Ti-Sheng,hsieh.ts@email.com,tw,2025/5/3 14:45
+C047,Edward Wright,edward@email.com,USA,2025/5/6 16:25
+C048,Ho Shuan,,Taiwan,2025/5/9 10:10
