@@ -11,3 +11,4 @@ langchain-mcp-adapters>=0.1.0,<1.0.0
 langchain-core>=0.3.0
 python-dotenv>=1.0.0
 langsmith>=0.1.0
+plotly>=5.0.0

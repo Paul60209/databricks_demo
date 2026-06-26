@@ -7,6 +7,7 @@ Run:
 
 import sys
 import uuid
+import json
 from pathlib import Path
 
 # Allow importing agent/ from repo root
@@ -23,7 +24,12 @@ from agent.mcp_client import make_mcp_client
 from agent.graph import build_graph
 from agent.state import AgentState
 from file_processor import process_files
-from output_generator import to_csv, to_excel, to_pdf, to_png
+from output_generator import to_csv, to_excel, to_pdf
+import plotly.graph_objects as go
+import pandas as pd
+
+_TEMP_DIR = Path(__file__).parent.parent / "public" / "temp_files"
+_TEMP_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -133,34 +139,92 @@ async def on_message(message: cl.Message):
     tool_results = result.get("tool_results", [])
     iterations = result.get("iteration_count", 1)
 
-    # 5. Build response text (include iteration info as a subtle footer)
-    footer = f"\n\n---\n*{iterations} iteration(s) | {len(tool_results)} tool call(s)*"
-    thinking_msg.content = answer + footer
+    # 5. Remove thinking placeholder
+    await thinking_msg.remove()
 
-    # 6. Build downloadable attachments
+    # 6. Build elements — write files to public/temp_files/ so Chainlit can serve via URL
+    uid = uuid.uuid4().hex[:8]
     elements = []
 
     if tool_results:
-        csv_bytes = to_csv(tool_results)
-        xlsx_bytes = to_excel(tool_results)
+        csv_path  = _TEMP_DIR / f"results_{uid}.csv"
+        xlsx_path = _TEMP_DIR / f"results_{uid}.xlsx"
+        csv_path.write_bytes(to_csv(tool_results))
+        xlsx_path.write_bytes(to_excel(tool_results))
         elements += [
-            cl.File(name="results.csv", content=csv_bytes, display="inline"),
-            cl.File(name="results.xlsx", content=xlsx_bytes, display="inline"),
+            cl.File(name="results.csv",  url=f"/public/temp_files/results_{uid}.csv",  display="inline"),
+            cl.File(name="results.xlsx", url=f"/public/temp_files/results_{uid}.xlsx", display="inline"),
         ]
 
     if _wants_chart(question) and tool_results:
         try:
-            png_bytes = to_png(tool_results, question=message.content)
-            elements.append(cl.Image(name="chart.png", content=png_bytes, display="inline"))
-        except Exception:
-            pass  # chart generation is best-effort
-
-    if _wants_report(question):
-        try:
-            pdf_bytes = to_pdf(message.content, answer, tool_results)
-            elements.append(cl.File(name="report.pdf", content=pdf_bytes, display="inline"))
+            fig = _build_plotly(tool_results, question=message.content)
+            elements.append(cl.Plotly(name="chart", figure=fig, display="inline"))
         except Exception:
             pass
 
-    thinking_msg.elements = elements
-    await thinking_msg.update()
+    if _wants_report(question):
+        try:
+            pdf_path = _TEMP_DIR / f"report_{uid}.pdf"
+            pdf_path.write_bytes(to_pdf(message.content, answer, tool_results))
+            elements.append(cl.File(name="report.pdf", url=f"/public/temp_files/report_{uid}.pdf", display="inline"))
+        except Exception:
+            pass
+
+    # 7. Send final answer + elements
+    footer = f"\n\n---\n*{iterations} iteration(s) | {len(tool_results)} tool call(s)*"
+    await cl.Message(content=answer + footer, elements=elements).send()
+
+
+def _build_plotly(tool_results: list[dict], question: str = "") -> go.Figure:
+    """Build a Plotly figure from tool_results."""
+    import ast
+    frames = []
+    for item in tool_results:
+        raw = item.get("result", "[]")
+        try:
+            parsed = ast.literal_eval(raw)
+            if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict) and "text" in parsed[0]:
+                data = json.loads(parsed[0]["text"])
+            else:
+                data = parsed
+        except Exception:
+            try:
+                data = json.loads(raw)
+            except Exception:
+                continue
+        if isinstance(data, list) and data:
+            frames.append(pd.DataFrame(data))
+        elif isinstance(data, dict) and "data" in data:
+            frames.append(pd.DataFrame(data["data"]))
+
+    df = pd.concat(frames, ignore_index=True) if frames else pd.DataFrame()
+    title = question[:70] + ("…" if len(question) > 70 else "")
+
+    if df.empty:
+        return go.Figure().update_layout(title="No data")
+
+    if "order_month" in df.columns:
+        df["order_month"] = pd.to_datetime(df["order_month"], errors="coerce")
+        df = df.sort_values("order_month")
+        value_col = next((c for c in ["aov", "avg_order_value", "total_order_amount"] if c in df.columns), None)
+        group_col = next((c for c in ["country", "customer_name"] if c in df.columns), None)
+        fig = go.Figure()
+        if value_col:
+            if group_col:
+                for label, grp in df.groupby(group_col):
+                    fig.add_trace(go.Scatter(x=grp["order_month"], y=grp[value_col], mode="lines+markers", name=str(label)))
+            else:
+                fig.add_trace(go.Scatter(x=df["order_month"], y=df[value_col], mode="lines+markers"))
+        fig.update_layout(title=title, xaxis_title="Month", yaxis_title=value_col or "")
+    else:
+        label_col = next((c for c in ["country", "customer_name", "customer_id"] if c in df.columns), df.columns[0])
+        value_col = next((c for c in ["aov", "avg_order_value", "total_order_amount", "total_order_count"] if c in df.columns),
+                         df.select_dtypes("number").columns[0] if not df.select_dtypes("number").empty else None)
+        fig = go.Figure()
+        if value_col:
+            df_plot = df[[label_col, value_col]].dropna().head(15)
+            fig.add_trace(go.Bar(x=df_plot[value_col], y=df_plot[label_col].astype(str), orientation="h"))
+        fig.update_layout(title=title, xaxis_title=value_col or "", yaxis_autorange="reversed")
+
+    return fig

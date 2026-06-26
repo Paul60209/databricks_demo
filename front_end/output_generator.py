@@ -3,6 +3,7 @@ Generate downloadable output files from agent tool_results.
 All functions return bytes suitable for Chainlit file attachments.
 """
 
+import ast
 import io
 import json
 from datetime import datetime
@@ -16,19 +17,33 @@ import matplotlib.ticker as mticker
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+def _extract_json(raw: str) -> list | dict | None:
+    """
+    tool_results[i]['result'] is str(mcp_response), which looks like:
+      "[{'type': 'text', 'text': '[{...actual JSON...}]', 'id': '...'}]"
+    Parse the outer Python repr, then extract the 'text' field containing real JSON.
+    """
+    try:
+        parsed = ast.literal_eval(raw)
+        if isinstance(parsed, list) and parsed and isinstance(parsed[0], dict) and "text" in parsed[0]:
+            return json.loads(parsed[0]["text"])
+        return parsed
+    except Exception:
+        try:
+            return json.loads(raw)
+        except Exception:
+            return None
+
+
 def _results_to_df(tool_results: list[dict]) -> pd.DataFrame:
     """Flatten tool_results into a single DataFrame."""
     frames = []
     for item in tool_results:
-        raw = item.get("result", "[]")
-        try:
-            data = json.loads(raw)
-            if isinstance(data, list) and data:
-                frames.append(pd.DataFrame(data))
-            elif isinstance(data, dict) and "data" in data:
-                frames.append(pd.DataFrame(data["data"]))
-        except (json.JSONDecodeError, ValueError):
-            pass
+        data = _extract_json(item.get("result", "[]"))
+        if isinstance(data, list) and data:
+            frames.append(pd.DataFrame(data))
+        elif isinstance(data, dict) and "data" in data:
+            frames.append(pd.DataFrame(data["data"]))
     if not frames:
         return pd.DataFrame()
     return pd.concat(frames, ignore_index=True)

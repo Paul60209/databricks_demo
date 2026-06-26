@@ -1,138 +1,209 @@
-# Databricks Semantic Layer Demo
+# Sony BI Chatbot — Databricks Demo
 
-A end-to-end data pipeline and semantic layer demo built on Databricks, designed to serve as the data foundation for a Multi-Agent AI system.
+An end-to-end AI-powered Business Intelligence system built on Databricks.  
+Natural language queries flow from a Chainlit chat UI through a LangGraph multi-agent system, reach Databricks via an MCP server, and return structured answers with downloadable data files.
 
 ![Architecture](sony_architecture.png)
 
 ---
 
-## Project Overview
+## Table of Contents
 
-This project demonstrates how to build a production-style **Lakehouse architecture** on Databricks using **Delta Live Tables (DLT)**, **Unity Catalog**, and a **Semantic Layer** — all connected to a downstream AI Agent system via MCP (Model Context Protocol).
-
-The architecture is divided into two phases:
-
-**Phase 1 — Semantic Data Layer**
-Ingest raw data, apply data quality rules and transformations across Bronze → Silver → Gold → Diamond layers, and expose clean semantic tables for querying.
-
-**Phase 2 — Catalog AI Assets** *(planned)*
-A Multi-Agent system built with Chainlit and LangGraph that queries the semantic layer through MCP tools, enabling natural language interactions with the data.
+1. [Semantic Layer](#semantic-layer)
+2. [MCP Server](#mcp-server)
+3. [Multiple AI Agents](#multiple-ai-agents)
+4. [Front End](#front-end)
+5. [LangSmith](#langsmith)
 
 ---
 
-## Pipeline Architecture
+## Semantic Layer
+
+**Location:** `sql_dlt.sql` / `pyspark_dlt.py` · `semantic_model.yml`
+
+A four-layer Lakehouse pipeline built with **Delta Live Tables (DLT)** and managed by **Unity Catalog**.
 
 ```
-Raw CSV Files
-     │
-     ▼
-┌─────────────┐
-│   BRONZE    │  External tables registered in Unity Catalog
-│ raw_customer│  (ingested via Databricks UI)
-│ raw_orders  │
-└──────┬──────┘
-       │
-       ▼
-┌─────────────────────────────────────────┐
-│               SILVER                    │
-│  dim_customers  — dedup + standardize   │
-│  fct_orders     — DQ filter + date fmt  │
-│  fct_orders_extended — stream-static    │
-│                       join              │
-└──────┬──────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────┐
-│                GOLD                     │
-│  agg_customer_monthly_stats             │
-│  (monthly aggregation by customer)      │
-└──────┬──────────────────────────────────┘
-       │
-       ▼
-┌─────────────────────────────────────────┐
-│              DIAMOND                    │
-│  sem_customer_transaction_summary       │
-│  sem_regional_monthly_aov               │
-└─────────────────────────────────────────┘
+Raw CSV
+  └─► Bronze   (demo.bronze)     — external tables, ingested via Databricks UI
+        └─► Silver  (demo.silver)    — DLT: clean, deduplicate, validate
+              └─► Gold    (demo.golden)   — DLT: monthly aggregation
+                    └─► Diamond (demo.diamond)  — semantic tables for AI consumption
+```
+
+| Layer | Table | Role |
+|-------|-------|------|
+| Silver | `dim_customers` | Country standardisation, email validation, dedup |
+| Silver | `fct_orders` | Date format unification, drop invalid amounts |
+| Silver | `fct_orders_extended` | Stream-static join of orders + customers |
+| Gold | `agg_customer_monthly_stats` | Monthly revenue & order count per customer |
+| Diamond | `sem_customer_transaction_summary` | Per-customer monthly stats (AOV, count, amount) |
+| Diamond | `sem_regional_monthly_aov` | AOV by country and month |
+
+`semantic_model.yml` registers business-friendly metric and dimension descriptions over the Diamond layer, enabling **Databricks AI/BI Genie** to answer natural language questions directly.
+
+---
+
+## MCP Server
+
+**Location:** `mcp_server/mcp_server.py` · `databricks_query.py`
+
+A **FastMCP** server (stdio transport) that exposes three tools to any MCP-compatible client.  
+`databricks_query.py` provides the underlying Databricks SQL connector functions.
+
+### Tools
+
+| Tool | Description | Key Parameters |
+|------|-------------|----------------|
+| `get_customer_transaction_summary` | Per-customer monthly stats from Diamond layer | `customer_ids`, `customer_names`, `months` |
+| `get_regional_monthly_aov` | AOV by country and month from Diamond layer | `countries`, `months` |
+| `query_data_with_natural_language` | Text-to-SQL via Claude Haiku → Databricks | `question` (free text) |
+
+### Call chain
+
+```
+MCP Client
+  └─► mcp_server.py  (FastMCP, stdio)
+        ├─► get_customer_transaction_summary
+        │     └─► databricks_query._query_customer()  →  Databricks SQL Warehouse
+        ├─► get_regional_monthly_aov
+        │     └─► databricks_query._query_aov()       →  Databricks SQL Warehouse
+        └─► query_data_with_natural_language
+              ├─► _generate_sql()   →  Claude Haiku  (text → SQL)
+              ├─► _validate_sql()   (block DDL / multi-statement)
+              └─► _run_query()      →  Databricks SQL Warehouse
 ```
 
 ---
 
-## Repository Structure
+## Multiple AI Agents
 
-| File | Description |
-|------|-------------|
-| `sql_dlt.sql` | Full DLT pipeline in SQL (Silver → Gold → Diamond) |
-| `pyspark_dlt.py` | Full DLT pipeline in PySpark (Silver → Gold → Diamond) |
-| `semantic_model.yml` | Unity Catalog semantic layer definition for AI/BI Genie |
-| `databricks_query.py` | Python query functions for MCP server integration |
-| `drop_table.sql.dbquery.ipynb` | Utility notebook to reset Silver/Gold/Diamond tables |
-| `raw_customer_profile.csv` | Sample customer data (48 records, intentionally dirty) |
-| `raw_order_transactions.csv` | Sample order data (1,000 records, mixed formats) |
+**Location:** `agent/`
 
----
+A **LangGraph** `StateGraph` with two agents in a PASS / FAIL feedback loop (max 3 iterations).
 
-## Key DLT Concepts Demonstrated
+### Agents
 
-- **LIVE TABLE vs STREAMING TABLE** — dimension tables use full-refresh materialized views; fact tables use incremental streaming
-- **Stream-Static Join** — `fct_orders_extended` joins a streaming fact table with a static dimension table
-- **DLT Expectations** — `CONSTRAINT valid_amount EXPECT (amount > 0) ON VIOLATION DROP ROW`
-- **External table references** — Bronze tables live outside the pipeline (`demo.bronze.*`)
-- **Internal table references** — Silver/Gold/Diamond tables use the `live.` prefix
+| Agent | Model | Role |
+|-------|-------|------|
+| Think Agent (`think_agent.py`) | claude-sonnet-4-6 | Calls MCP tools, synthesises a business answer |
+| Judge Agent (`judge_agent.py`) | claude-haiku-4-5-20251001 | Evaluates the answer; returns PASS or FAIL with feedback |
 
----
+### State (`state.py`)
 
-## Diamond Layer (Semantic Tables)
+`AgentState` carries: `messages`, `user_question`, `tool_results`, `think_answer`, `judge_feedback`, `iteration_count`, `final_answer`, `is_complete`.
 
-Two semantic tables in `demo.diamond` expose clean, business-ready surfaces for downstream consumption:
+### Call chain
 
-**`sem_customer_transaction_summary`**
-Per-customer monthly transaction count and revenue. Supports filtering by `customer_id`, `customer_name`, or `order_month`.
-
-**`sem_regional_monthly_aov`**
-AOV (Average Order Value) aggregated by country and month. Supports filtering by `country` or `order_month`.
-
----
-
-## Query Functions (MCP Integration)
-
-`databricks_query.py` provides two functions designed to be registered as MCP tools:
-
-```python
-# Query 1: Customer transaction summary
-get_customer_transaction_summary(
-    customer_ids=["C001", "C005"],   # optional
-    customer_names=["John Doe"],      # optional
-    months=["2025-01", "2025-02"]    # optional — omit for all-time total
-)
-
-# Query 2: Regional AOV
-get_regional_monthly_aov(
-    countries=["Taiwan", "Japan"],    # optional
-    months=["2025-03"]               # optional
-)
+```
+run_agent.py  /  chainlit_app.py
+  └─► agent/mcp_client.py   make_mcp_client()   (MultiServerMCPClient, stdio subprocess)
+        └─► agent/graph.py  build_graph(tools)   (StateGraph)
+              ├─► think  node  (create_think_node)
+              │     ├─► Claude Sonnet  bind_tools(mcp_tools)
+              │     └─► tool.ainvoke()  →  MCP Server  →  Databricks
+              └─► judge  node  (judge_node)
+                    ├─► Claude Haiku  → verdict JSON  {"verdict": "PASS"|"FAIL", "feedback": "..."}
+                    └─► route_after_judge()
+                          ├─► PASS  →  END  (set final_answer)
+                          ├─► FAIL  →  think  (inject feedback, retry)
+                          └─► iteration >= 3  →  END  (force complete)
 ```
 
-Both functions return a `pandas.DataFrame`. Connection is configured via environment variables:
+---
+
+## Front End
+
+**Location:** `front_end/`
+
+A **Chainlit** chat UI with multilingual support and file I/O.
+
+### Features
+
+| Feature | Details |
+|---------|---------|
+| **Languages** | Auto-detected from user input: Traditional Chinese / English / Japanese |
+| **File upload** | CSV, Excel, PDF, Word — content extracted and injected as agent context |
+| **File download** | Query results auto-exported as CSV and Excel after every tool call |
+| **Charts** | Plotly interactive charts (keyword-triggered: *chart / 圖表 / グラフ*) |
+| **PDF report** | Keyword-triggered export (*report / 報告 / レポート*) including question, answer, and data table |
+
+### Key modules
+
+| File | Role |
+|------|------|
+| `chainlit_app.py` | Session lifecycle, message handler, element assembly |
+| `file_processor.py` | `process_files()` — parses uploaded files into plain text |
+| `output_generator.py` | `to_csv()`, `to_excel()`, `to_pdf()` — build downloadable bytes from `tool_results` |
+
+### Call chain
+
+```
+User message  (Chainlit @on_message)
+  └─► file_processor.process_files()          (parse uploads → text context)
+        └─► graph.ainvoke(AgentState)          (LangGraph, with LangSmith RunnableConfig)
+              └─► [Think → Judge loop]
+                    └─► tool_results[]         (accumulated MCP responses)
+                          ├─► output_generator.to_csv()    →  public/temp_files/
+                          ├─► output_generator.to_excel()  →  public/temp_files/
+                          ├─► _build_plotly()              →  cl.Plotly element
+                          └─► output_generator.to_pdf()    →  public/temp_files/
+```
+
+---
+
+## LangSmith
+
+**Location:** `.env` (env vars) · `front_end/chainlit_app.py` (RunnableConfig)
+
+LangGraph and LangChain have **built-in LangSmith tracing** — no code decoration needed.  
+Setting three environment variables activates full tracing automatically.
 
 ```bash
-export DATABRICKS_HOST="adb-xxxxxxxxxxxx.xx.azuredatabricks.net"
-export DATABRICKS_HTTP_PATH="/sql/1.0/warehouses/xxxxxxxxxxxxxxxx"
-export DATABRICKS_TOKEN="your_personal_access_token"
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=ls__xxxxxxxx
+LANGCHAIN_PROJECT=sony-bi-chatbot
 ```
 
+Each chat message produces one root trace in LangSmith with nested spans:
+
+```
+[user question]  (root run)
+  └─► LangGraph
+        ├─► think  (iteration 1)
+        │     ├─► ChatAnthropic  claude-sonnet-4-6   ← token counts
+        │     └─► MCP tool calls                     ← latency, args, output
+        └─► judge  (iteration 1)
+              └─► ChatAnthropic  claude-haiku-4-5    ← token counts, verdict
+```
+
+`RunnableConfig` in `chainlit_app.py` attaches `session_id` metadata and `sony-bi-chatbot` tag to every run, enabling per-session filtering and cost aggregation in the LangSmith dashboard.
+
 ---
 
-## Semantic Layer (Unity Catalog YAML)
+## Environment Variables
 
-`semantic_model.yml` defines business-friendly metric and dimension descriptions over the Diamond layer, compatible with **Databricks AI/BI Genie** for natural language querying.
+```bash
+# Databricks
+DATABRICKS_HOST=adb-xxxxxxxxxxxx.xx.azuredatabricks.net
+DATABRICKS_HTTP_PATH=/sql/1.0/warehouses/xxxxxxxxxxxxxxxx
+DATABRICKS_TOKEN=your_personal_access_token
 
----
+# Anthropic
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxx
 
-## Setup
+# LangSmith
+LANGCHAIN_TRACING_V2=true
+LANGCHAIN_API_KEY=ls__xxxxxxxx
+LANGCHAIN_PROJECT=sony-bi-chatbot
+```
 
-1. Upload `raw_customer_profile.csv` and `raw_order_transactions.csv` to DBFS or a cloud storage path
-2. Register them as external tables under `demo.bronze` via the Databricks UI
-3. Create a DLT pipeline in Databricks pointing to `sql_dlt.sql` or `pyspark_dlt.py`
-4. Run the pipeline — Silver, Gold, and Diamond tables will be created automatically
-5. To reset, run `drop_table.sql.dbquery.ipynb` and re-trigger the pipeline
+## Quick Start
+
+```bash
+# Install front-end dependencies
+cd front_end && pip install -r requirements.txt
+
+# Start Chainlit
+chainlit run front_end/chainlit_app.py --port 8000
+```
