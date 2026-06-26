@@ -6,6 +6,7 @@ Run:
 """
 
 import sys
+import uuid
 from pathlib import Path
 
 # Allow importing agent/ from repo root
@@ -16,6 +17,7 @@ load_dotenv(dotenv_path=Path(__file__).parent.parent / ".env")
 
 import chainlit as cl
 from langchain_core.messages import HumanMessage
+from langchain_core.runnables import RunnableConfig
 
 from agent.mcp_client import make_mcp_client
 from agent.graph import build_graph
@@ -74,6 +76,7 @@ async def start():
     # Store both client and graph; client must stay alive to keep MCP subprocess running
     cl.user_session.set("client", client)
     cl.user_session.set("graph", graph)
+    cl.user_session.set("session_id", str(uuid.uuid4()))
 
     msg.content = WELCOME_MSG
     await msg.update()
@@ -98,18 +101,29 @@ async def on_message(message: cl.Message):
     thinking_msg = cl.Message(content="Thinking… ⏳")
     await thinking_msg.send()
 
-    # 4. Run LangGraph agent
+    # 4. Run LangGraph agent (RunnableConfig enables LangSmith tracing with session metadata)
+    langsmith_config = RunnableConfig(
+        run_name=message.content[:60],
+        metadata={
+            "session_id": cl.user_session.get("session_id"),
+            "user_question": message.content,
+        },
+        tags=["sony-bi-chatbot"],
+    )
     try:
-        result: AgentState = await graph.ainvoke({
-            "messages": [HumanMessage(content=question)],
-            "user_question": question,
-            "tool_results": [],
-            "think_answer": "",
-            "judge_feedback": "",
-            "iteration_count": 0,
-            "final_answer": "",
-            "is_complete": False,
-        })
+        result: AgentState = await graph.ainvoke(
+            {
+                "messages": [HumanMessage(content=question)],
+                "user_question": question,
+                "tool_results": [],
+                "think_answer": "",
+                "judge_feedback": "",
+                "iteration_count": 0,
+                "final_answer": "",
+                "is_complete": False,
+            },
+            config=langsmith_config,
+        )
     except Exception as exc:
         thinking_msg.content = f"❌ Agent error: {exc}"
         await thinking_msg.update()
