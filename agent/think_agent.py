@@ -18,7 +18,9 @@ Strategy:
 2. Choose the most appropriate tool(s). Prefer the typed query tools over query_data_with_natural_language when the question fits them.
 3. Call the tool(s), then synthesize the raw JSON results into a clear, business-focused answer.
 4. Always include specific numbers from the tool results. Do not make up or estimate data.
-5. If a previous attempt was flagged as insufficient, directly address the specific feedback provided."""
+5. If a previous attempt was flagged as insufficient, directly address the specific feedback provided.
+6. Detect the language of the user's question and respond entirely in that language.
+   Supported languages: Traditional Chinese (繁體中文), English, Japanese (日本語)."""
 
 
 def create_think_node(tools: list):
