@@ -1,0 +1,4 @@
+mcp[cli]>=1.0.0
+anthropic>=0.40.0
+databricks-sql-connector>=3.0.0
+pandas>=2.0.0
