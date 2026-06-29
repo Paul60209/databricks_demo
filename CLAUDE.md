@@ -2,7 +2,7 @@
 
 ## Project Purpose
 
-This project builds a **Lakehouse + Semantic Layer** on Databricks as the data foundation for a Sony AI chatbot system. The end goal is a Multi-Agent AI system that lets business users query enterprise data through natural language.
+This project builds a **Lakehouse + Semantic Layer** on Databricks as the data foundation for a FPT-FAI AI chatbot system. The end goal is a Multi-Agent AI system that lets business users query enterprise data through natural language.
 
 The architecture has two phases:
 - **Phase 1**: Clean, structured data pipeline (Bronze → Silver → Gold → Diamond) with a semantic layer exposed via Unity Catalog and MCP query functions
@@ -33,7 +33,14 @@ The architecture has two phases:
 | `front_end/chainlit_app.py` | Frontend | Chainlit app: session lifecycle, message handler, file elements |
 | `front_end/file_processor.py` | Frontend | Parses uploaded CSV/Excel/PDF/Word into plain text |
 | `front_end/output_generator.py` | Frontend | Generates CSV/Excel/PDF bytes from tool_results |
+| `front_end/FPT_logo.png` | Branding | FPT logo source file (400×400 PNG) |
 | `public/temp_files/` | Frontend | Temp dir for downloadable files; served as Chainlit static files |
+| `public/FPT_logo.png` | Branding | FPT logo served as Chainlit static asset |
+| `public/custom.css` | Frontend | Custom CSS: expands `#header` to 96px for logo display |
+| `public/custom.js` | Frontend | Injects FPT logo (80px) into Chainlit `#header` via JS |
+| `chainlit.md` | Frontend | Chainlit readme/info panel — tri-lingual (EN→JP→ZH), FPT logo inline |
+| `front_end/chainlit.md` | Frontend | Same as above (Chainlit reads from working directory) |
+| `FPT_databricks+agentic AI_architecture.png` | Docs | Architecture diagram — FPT-FAI version |
 | `README.md` | Docs | English README (GitHub default) |
 | `README_CN.md` | Docs | Traditional Chinese README |
 | `README_JP.md` | Docs | Japanese README |
@@ -108,10 +115,10 @@ Enabled via env vars — no code changes needed:
 ```
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_API_KEY=ls__xxxxxxxx
-LANGCHAIN_PROJECT=sony-bi-chatbot
+LANGCHAIN_PROJECT=fpt-fai-ai-chatbot
 ```
 
-Each `graph.ainvoke()` call is one root trace. `RunnableConfig` in `chainlit_app.py` attaches `session_id` metadata and `sony-bi-chatbot` tag.
+Each `graph.ainvoke()` call is one root trace. `RunnableConfig` in `chainlit_app.py` attaches `session_id` metadata and `fpt-fai-ai-chatbot` tag.
 
 **Important:** Judge Agent spans appear as a **sibling** of Think Agent in the LangSmith trace tree, NOT nested inside Think. They do NOT appear in the `messages` output (Judge only updates `is_complete`, `final_answer`, `judge_feedback`). To see Judge, expand the LangGraph span tree in LangSmith's timeline/trace view.
 
@@ -131,6 +138,7 @@ Each `graph.ainvoke()` call is one root trace. `RunnableConfig` in `chainlit_app
 - [x] **Chainlit frontend** — multilingual, file upload/download, Plotly charts
 - [x] **LangSmith integration** — full trace with session metadata and token tracking
 - [x] **Multilingual README** — EN (`README.md`), 繁體中文 (`README_CN.md`), 日本語 (`README_JP.md`)
+- [x] **FPT-FAI branding** — removed all Sony references; repo is now client-agnostic (branch: `feature/fpt-demo` → merged to `main`)
 
 ---
 
@@ -165,6 +173,30 @@ Chainlit 2.x requires a cloud storage backend (S3/GCS/Azure) for `cl.File(conten
 ### langchain-mcp-adapters 0.1.x
 `MultiServerMCPClient` cannot be used as an `async with` context manager (removed in 0.1.0).  
 **Use**: `tools = await client.get_tools()` directly. Keep `client` alive in `cl.user_session` to prevent subprocess from being killed.
+
+---
+
+## Chainlit UI Customisation (`public/`)
+
+| File | Purpose |
+|------|---------|
+| `public/custom.css` | Expands `#header` to 96px height to accommodate the 80px FPT logo |
+| `public/custom.js` | On page load, queries `#header` and prepends an 80px FPT logo `<img>` |
+| `public/FPT_logo.png` | Static asset served at `/public/FPT_logo.png` |
+
+`.chainlit/config.toml` key settings:
+```toml
+logo_file_url = "/public/FPT_logo.png"      # avatar in chat messages
+default_avatar_file_url = "/public/FPT_logo.png"
+avatar_size = 48
+custom_css = "/public/custom.css"
+custom_js = "/public/custom.js"
+unsafe_allow_html = true                     # required for inline HTML in chainlit.md
+```
+
+`chainlit.md` format: FPT logo (via CSS `background-image` on `<span>` — avoids Chainlit's 16:9 media card wrapping) + title on same line, followed by three language sections in order EN → JP → ZH.
+
+> **Why `<span>` not `<img>`**: Chainlit's markdown parser detects `<img>` tags and wraps them in a Radix aspect-ratio card (16:9). Using a `<span>` with `background:url(...)` bypasses this and allows true inline display.
 
 ---
 

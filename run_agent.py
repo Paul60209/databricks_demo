@@ -1,5 +1,5 @@
 """
-Sony AI Chatbot — LangGraph Multi-Agent CLI
+FPT-FAI AI Chatbot — LangGraph Multi-Agent CLI
 
 Usage:
     python run_agent.py "Taiwan 地區 2025 年 Q1 的 AOV 趨勢"
@@ -53,7 +53,7 @@ async def run(question: str, verbose: bool = False) -> str:
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Sony AI Chatbot — LangGraph Multi-Agent CLI"
+        description="FPT-FAI AI Chatbot — LangGraph Multi-Agent CLI"
     )
     parser.add_argument("question", help="Natural language business question")
     parser.add_argument(

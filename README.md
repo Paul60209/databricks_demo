@@ -1,9 +1,9 @@
-# Sony BI Chatbot — Databricks Demo
+# FPT-FAI AI Chatbot — Databricks Demo
 
-An end-to-end AI-powered Business Intelligence system built on Databricks.  
+An end-to-end AI system built on Databricks.  
 Natural language queries flow from a Chainlit chat UI through a LangGraph multi-agent system, reach Databricks via an MCP server, and return structured answers with downloadable data files.
 
-![Architecture](sony_architecture.png)
+![Architecture](<FPT_databricks+agentic AI_architecture.png>)
 
 ---
 
@@ -162,7 +162,7 @@ Setting three environment variables activates full tracing automatically.
 ```bash
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_API_KEY=ls__xxxxxxxx
-LANGCHAIN_PROJECT=sony-bi-chatbot
+LANGCHAIN_PROJECT=fpt-fai-ai-chatbot
 ```
 
 Each chat message produces one root trace in LangSmith with nested spans:
@@ -177,7 +177,7 @@ Each chat message produces one root trace in LangSmith with nested spans:
               └─► ChatAnthropic  claude-haiku-4-5    ← token counts, verdict
 ```
 
-`RunnableConfig` in `chainlit_app.py` attaches `session_id` metadata and `sony-bi-chatbot` tag to every run, enabling per-session filtering and cost aggregation in the LangSmith dashboard.
+`RunnableConfig` in `chainlit_app.py` attaches `session_id` metadata and `fpt-fai-ai-chatbot` tag to every run, enabling per-session filtering and cost aggregation in the LangSmith dashboard.
 
 ---
 
@@ -195,7 +195,7 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxx
 # LangSmith
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_API_KEY=ls__xxxxxxxx
-LANGCHAIN_PROJECT=sony-bi-chatbot
+LANGCHAIN_PROJECT=fpt-fai-ai-chatbot
 ```
 
 ## Quick Start
