@@ -1,0 +1,5 @@
+/* Expand header to fit 80px logo */
+#header {
+  height: 96px !important;
+  min-height: 96px !important;
+}

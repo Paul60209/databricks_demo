@@ -82,7 +82,7 @@ def to_pdf(question: str, answer: str, tool_results: list[dict]) -> bytes:
 
     # Title
     pdf.set_font("Helvetica", "B", 16)
-    pdf.cell(0, 10, "Sony Business Intelligence Report", ln=True, align="C")
+    pdf.cell(0, 10, "FPT-FAI AI Report", ln=True, align="C")
     pdf.set_font("Helvetica", "", 9)
     pdf.cell(0, 6, f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M')}", ln=True, align="C")
     pdf.ln(4)

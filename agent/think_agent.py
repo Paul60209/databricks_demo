@@ -5,7 +5,7 @@ from .state import AgentState
 
 _MAX_TOOL_ROUNDS = 5
 
-_SYSTEM_PROMPT = """You are a data analyst for Sony's business intelligence platform.
+_SYSTEM_PROMPT = """You are a data analyst for FPT-FAI's AI platform.
 You have access to Databricks tools that query a customer transaction database.
 
 Tools available:

@@ -1,5 +1,5 @@
 """
-Sony BI Chatbot — Chainlit Frontend
+FPT-FAI AI Chatbot — Chainlit Frontend
 
 Run:
     chainlit run front_end/chainlit_app.py --port 8000
@@ -34,10 +34,10 @@ _TEMP_DIR.mkdir(parents=True, exist_ok=True)
 # ── Constants ─────────────────────────────────────────────────────────────────
 
 WELCOME_MSG = """\
-Welcome to **Sony Business Intelligence Chatbot**! 🤖
+Welcome to **FPT-FAI AI Chatbot**! 🤖
 
-您好！歡迎使用 **Sony 商業智慧聊天機器人**！
-ソニービジネスインテリジェンスへようこそ！
+您好！歡迎使用 **FPT-FAI AI 聊天機器人**！
+FPT-FAI AI チャットボットへようこそ！
 
 ---
 Ask questions in **English**, **繁體中文**, or **日本語** — I'll reply in the same language.
@@ -114,7 +114,7 @@ async def on_message(message: cl.Message):
             "session_id": cl.user_session.get("session_id"),
             "user_question": message.content,
         },
-        tags=["sony-bi-chatbot"],
+        tags=["fpt-fai-ai-chatbot"],
     )
     try:
         result: AgentState = await graph.ainvoke(

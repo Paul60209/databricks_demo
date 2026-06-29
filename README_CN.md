@@ -1,9 +1,9 @@
-# Sony BI 聊天機器人 — Databricks Demo
+# FPT-FAI AI 聊天機器人 — Databricks Demo
 
-以 Databricks 為基礎的端到端 AI 商業智慧系統。  
+以 Databricks 為基礎的端到端 AI 系統。  
 使用者透過 Chainlit 聊天介面以自然語言提問，訊息經由 LangGraph 多代理系統處理後，透過 MCP Server 查詢 Databricks，最終回傳結構化答案並附帶可下載的資料檔案。
 
-![架構圖](sony_architecture.png)
+![架構圖](<FPT_databricks+agentic AI_architecture.png>)
 
 ---
 
@@ -161,7 +161,7 @@ LangGraph 與 LangChain 內建 LangSmith 追蹤功能，**無需修改程式碼*
 ```bash
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_API_KEY=ls__xxxxxxxx
-LANGCHAIN_PROJECT=sony-bi-chatbot
+LANGCHAIN_PROJECT=fpt-fai-ai-chatbot
 ```
 
 每則聊天訊息在 LangSmith 產生一筆根追蹤，包含巢狀的子節點：
@@ -176,7 +176,7 @@ LANGCHAIN_PROJECT=sony-bi-chatbot
               └─► ChatAnthropic  claude-haiku-4-5    ← Token 用量、評判結果
 ```
 
-`chainlit_app.py` 中的 `RunnableConfig` 為每次執行附加 `session_id` metadata 與 `sony-bi-chatbot` 標籤，方便在 LangSmith 儀表板中依對話過濾及彙總費用。
+`chainlit_app.py` 中的 `RunnableConfig` 為每次執行附加 `session_id` metadata 與 `fpt-fai-ai-chatbot` 標籤，方便在 LangSmith 儀表板中依對話過濾及彙總費用。
 
 ---
 
@@ -194,7 +194,7 @@ ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxx
 # LangSmith
 LANGCHAIN_TRACING_V2=true
 LANGCHAIN_API_KEY=ls__xxxxxxxx
-LANGCHAIN_PROJECT=sony-bi-chatbot
+LANGCHAIN_PROJECT=fpt-fai-ai-chatbot
 ```
 
 ## 快速啟動
