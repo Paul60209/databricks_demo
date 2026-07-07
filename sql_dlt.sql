@@ -3,7 +3,7 @@
 -- Business Logic: Standardize country names using CASE WHEN, and deduplicate using window functions.
 -- Note: Dimension deduplication requires a full scan, hence declared as a LIVE TABLE (Materialized View).
 -- =====================================================================
-CREATE OR REFRESH LIVE TABLE dim_customers
+CREATE OR REFRESH LIVE TABLE demo.silver.dim_customers
 COMMENT "Customer dimension table after country name standardization and latest record deduplication"
 AS
 WITH ranked_customers AS (
@@ -37,7 +37,7 @@ WHERE rn = 1;
 -- Business Logic: Use CONSTRAINT to intercept dirty data (amount <= 0), and standardize mixed date formats into DATE type.
 -- Note: External data source must use the STREAM() keyword to enable incremental computation.
 -- =====================================================================
-CREATE OR REFRESH STREAMING TABLE fct_orders(
+CREATE OR REFRESH STREAMING TABLE demo.silver.fct_orders(
   -- Data Quality Control: Drop the row completely if the amount is invalid
   CONSTRAINT valid_amount EXPECT (amount > 0) ON VIOLATION DROP ROW
 )
@@ -61,7 +61,7 @@ FROM STREAM(demo.bronze.raw_order_transactions);
 -- Business Logic: LEFT JOIN the streaming fact table with the deduplicated static dimension table.
 -- Note: This demonstrates a classic Stream-Static Join architecture.
 -- =====================================================================
-CREATE OR REFRESH STREAMING TABLE fct_orders_extended
+CREATE OR REFRESH STREAMING TABLE demo.silver.fct_orders_extended
 COMMENT "Streaming wide table integrating order facts and customer dimensions"
 AS SELECT
   o.order_id,
@@ -83,7 +83,7 @@ LEFT JOIN live.dim_customers c
 -- Business Logic: Group by Year-Month, Country, and Customer from the wide table to calculate operational metrics.
 -- Note: Data aggregations require a holistic view, hence declared as a LIVE TABLE for full materialization.
 -- =====================================================================
-CREATE OR REFRESH LIVE TABLE agg_customer_monthly_stats
+CREATE OR REFRESH LIVE TABLE demo.golden.agg_customer_monthly_stats
 COMMENT "Monthly operational metrics aggregated by year-month, country, and customer"
 AS SELECT
   date_trunc('MONTH', order_date) AS order_month,
@@ -102,7 +102,7 @@ GROUP BY 1, 2, 3, 4;
 -- Supports filtering by customer_id, customer_name, or order_month in the query layer.
 -- Note: Reads from gold aggregation; declared as LIVE TABLE for full materialization.
 -- =====================================================================
-CREATE OR REFRESH LIVE TABLE sem_customer_transaction_summary
+CREATE OR REFRESH LIVE TABLE demo.diamond.sem_customer_transaction_summary
 COMMENT "Semantic table exposing per-customer monthly transaction count and revenue for downstream query and AI agent consumption"
 AS SELECT
   customer_id,
@@ -121,7 +121,7 @@ FROM live.agg_customer_monthly_stats;
 -- Supports filtering by country or order_month in the query layer.
 -- Note: Reads from gold aggregation; declared as LIVE TABLE for full materialization.
 -- =====================================================================
-CREATE OR REFRESH LIVE TABLE sem_regional_monthly_aov
+CREATE OR REFRESH LIVE TABLE demo.diamond.sem_regional_monthly_aov
 COMMENT "Semantic table exposing regional monthly AOV (Average Order Value) for downstream query and AI agent consumption"
 AS SELECT
   country,
