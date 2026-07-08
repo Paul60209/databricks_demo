@@ -105,7 +105,7 @@ def agg_customer_monthly_stats():
     comment="Semantic table exposing per-customer monthly transaction count and revenue for downstream query and AI agent consumption"
 )
 def sem_customer_transaction_summary():
-    gold = dlt.read("agg_customer_monthly_stats")
+    gold = dlt.read("demo.golden.agg_customer_monthly_stats")
     return gold.select(
         col("customer_id"),
         col("customer_name"),
@@ -126,7 +126,7 @@ def sem_customer_transaction_summary():
     comment="Semantic table exposing regional monthly AOV (Average Order Value) for downstream query and AI agent consumption"
 )
 def sem_regional_monthly_aov():
-    gold = dlt.read("agg_customer_monthly_stats")
+    gold = dlt.read("demo.golden.agg_customer_monthly_stats")
     return (
         gold
         .groupBy("country", "order_month")
