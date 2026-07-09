@@ -161,6 +161,15 @@ Each `graph.ainvoke()` call is one root trace. `RunnableConfig` in `chainlit_app
 
 ## Known Issues & Workarounds
 
+### Streaming checkpoint mismatch after `drop_table.sql` reset
+`fct_orders` and `fct_orders_extended` are DLT STREAMING TABLEs. Their internal streaming checkpoint tracks the upstream table's physical Delta table UUID, not just its catalog name. If you run `drop_table.sql` (plain `DROP TABLE`/`DROP VIEW`) and then re-run the pipeline with a normal incremental **Refresh**, `fct_orders` gets recreated with a new physical UUID but `fct_orders_extended`'s checkpoint still expects the old one. This fails with:
+```
+[DIFFERENT_DELTA_TABLE_READ_BY_STREAMING_SOURCE] The streaming query was reading from an
+unexpected Delta table... It used to read from another Delta table according to checkpoint.
+```
+which can surface in the pipeline UI as `TABLE_DOES_NOT_EXIST: Staging Table '...' does not exist`.
+**Workaround**: after running `drop_table.sql`, always trigger a **Full Refresh** of the pipeline (not a plain Refresh/Start) before re-running `sql_dlt.sql`/`pyspark_dlt.py` — Full Refresh resets the streaming checkpoints along with the tables. (Root-caused via the pipeline's Unity Catalog event log, `demo.silver.event_log_<pipeline_id>`, which has an `error` struct column with the full exception — useful for debugging any future DLT failures beyond what the notebook/UI error message shows.)
+
 ### MCP subprocess env vars
 `MultiServerMCPClient` spawns the MCP server as a subprocess which does **not** inherit parent env vars automatically. Must pass explicitly:
 ```python
