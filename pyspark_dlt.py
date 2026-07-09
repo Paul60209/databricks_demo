@@ -1,5 +1,5 @@
 import dlt
-from pyspark.sql.functions import col, expr, row_number, lower, coalesce, to_date, date_trunc, count, sum, round
+from pyspark.sql.functions import col, expr, row_number, lower, coalesce, to_date, date_trunc, count, sum
 from pyspark.sql.window import Window
 
 # =====================================================================
@@ -96,43 +96,7 @@ def agg_customer_monthly_stats():
     )
 
 # =====================================================================
-# 7. DIAMOND LAYER: sem_customer_transaction_summary (Semantic: Customer Transactions)
-# Business Logic: Expose customer-level monthly transaction stats as a clean semantic surface.
-# Supports filtering by customer_id, customer_name, or order_month in the query layer.
+# The Diamond layer (semantic layer) is no longer managed by this DLT
+# pipeline. It's a Unity Catalog Metric View, deployed independently via
+# metric_views/deploy_metric_view.py — see CLAUDE.md for details.
 # =====================================================================
-@dlt.table(
-    name="demo.diamond.sem_customer_transaction_summary",
-    comment="Semantic table exposing per-customer monthly transaction count and revenue for downstream query and AI agent consumption"
-)
-def sem_customer_transaction_summary():
-    gold = dlt.read("demo.golden.agg_customer_monthly_stats")
-    return gold.select(
-        col("customer_id"),
-        col("customer_name"),
-        col("country"),
-        col("order_month"),
-        col("total_order_count"),
-        col("total_order_amount"),
-        round(col("total_order_amount") / col("total_order_count"), 2).alias("avg_order_value")
-    )
-
-# =====================================================================
-# 8. DIAMOND LAYER: sem_regional_monthly_aov (Semantic: Regional AOV)
-# Business Logic: Aggregate to country + month level and compute AOV (Average Order Value).
-# Supports filtering by country or order_month in the query layer.
-# =====================================================================
-@dlt.table(
-    name="demo.diamond.sem_regional_monthly_aov",
-    comment="Semantic table exposing regional monthly AOV (Average Order Value) for downstream query and AI agent consumption"
-)
-def sem_regional_monthly_aov():
-    gold = dlt.read("demo.golden.agg_customer_monthly_stats")
-    return (
-        gold
-        .groupBy("country", "order_month")
-        .agg(
-            sum("total_order_count").alias("total_order_count"),
-            round(sum("total_order_amount"), 2).alias("total_order_amount"),
-            round(sum("total_order_amount") / sum("total_order_count"), 2).alias("aov")
-        )
-    )

@@ -1,0 +1,38 @@
+version: 1.1
+comment: >
+  Unity Catalog metric view for the Databricks demo pipeline. Single source of
+  truth for order-count, revenue, and AOV metrics, sliced by customer, country,
+  and month. Replaces the former demo.diamond.sem_customer_transaction_summary
+  and demo.diamond.sem_regional_monthly_aov tables. Sourced from
+  demo.golden.agg_customer_monthly_stats. Queryable via MEASURE(...) + GROUP BY.
+
+source: demo.golden.agg_customer_monthly_stats
+
+fields:
+  - name: customer_id
+    expr: customer_id
+    comment: Unique identifier for the customer (e.g. C001)
+  - name: customer_name
+    expr: customer_name
+    comment: Full name of the customer
+  - name: country
+    expr: country
+    comment: >
+      Standardized country name. Possible values: Taiwan, Japan,
+      United States, Unknown.
+  - name: order_month
+    expr: order_month
+    comment: First day of the calendar month (e.g. 2025-01-01 = January 2025)
+
+measures:
+  - name: total_order_count
+    expr: SUM(total_order_count)
+    comment: Total number of orders
+  - name: total_order_amount
+    expr: SUM(total_order_amount)
+    comment: Total revenue (sum of order amounts)
+  - name: avg_order_value
+    expr: SUM(total_order_amount) / SUM(total_order_count)
+    comment: >
+      Average order value (AOV), correctly weighted at any grouping grain
+      because it's a ratio of the two base measures, not an average-of-averages.

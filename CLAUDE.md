@@ -18,11 +18,12 @@ The architecture has two phases:
 |------|-------------|-------------|
 | `raw_customer_profile.csv` | Source | 48 customer records with intentional dirty data |
 | `raw_order_transactions.csv` | Source | 1,000 order records with mixed date formats, negative amounts |
-| `sql_dlt.sql` | Silver→Diamond | Full DLT pipeline in SQL |
-| `pyspark_dlt.py` | Silver→Diamond | Full DLT pipeline in PySpark |
-| `semantic_model.yml` | Diamond | Unity Catalog semantic layer definition for AI/BI Genie |
+| `sql_dlt.sql` | Silver→Gold | Full DLT pipeline in SQL (Diamond is no longer DLT-managed) |
+| `pyspark_dlt.py` | Silver→Gold | Full DLT pipeline in PySpark (Diamond is no longer DLT-managed) |
+| `metric_views/customer_orders_metric_view.yml` | Diamond | Unity Catalog Metric View YAML spec (real semantic layer object) |
+| `metric_views/deploy_metric_view.py` | Diamond | Deploys/redeploys the Metric View via `CREATE OR REPLACE VIEW ... WITH METRICS` |
 | `databricks_query.py` | Query | Base Databricks SQL connector functions used by MCP server |
-| `drop_table.sql.dbquery.ipynb` | Utility | Resets Silver/Gold/Diamond tables for re-running demos |
+| `drop_table.sql.dbquery.ipynb` | Utility | Resets Silver/Gold tables and drops the Diamond Metric View for re-running demos |
 | `mcp_server/mcp_server.py` | MCP | FastMCP server exposing 3 tools over stdio |
 | `agent/state.py` | Agent | AgentState TypedDict definition |
 | `agent/mcp_client.py` | Agent | MultiServerMCPClient factory with explicit env var passing |
@@ -61,9 +62,19 @@ The architecture has two phases:
 ### Gold (`demo.golden`) — DLT managed tables
 - `agg_customer_monthly_stats` — LIVE TABLE: monthly aggregation by customer × country
 
-### Diamond (`demo.diamond`) — Semantic layer, DLT managed tables
-- `sem_customer_transaction_summary` — per-customer monthly stats (count, amount, AOV)
-- `sem_regional_monthly_aov` — AOV aggregated by country × month
+### Diamond (`demo.diamond`) — Unity Catalog Metric View (NOT DLT-managed)
+- `vw_customer_orders_metrics` — a native UC Metric View (`CREATE VIEW ... WITH METRICS
+  LANGUAGE YAML`), sourced from `demo.golden.agg_customer_monthly_stats` (customer ×
+  country × month grain). Defines shared measures `total_order_count`,
+  `total_order_amount`, `avg_order_value` (a ratio of the two base measures, so it's
+  correctly weighted at any grouping grain) over fields `customer_id`, `customer_name`,
+  `country`, `order_month`. Queried via `MEASURE(...)` + `GROUP BY` — one object now
+  serves both the per-customer-monthly and regional-AOV query shapes, just different
+  GROUP BY combinations. Replaces the former `sem_customer_transaction_summary` and
+  `sem_regional_monthly_aov` physical tables.
+- Deployed/updated via `python metric_views/deploy_metric_view.py` — this is DDL run
+  against the SQL warehouse, **independent of `pyspark_dlt.py`/`sql_dlt.sql`** and the
+  DLT pipeline graph (see Notes for Claude below).
 
 ---
 
@@ -129,8 +140,7 @@ Each `graph.ainvoke()` call is one root trace. `RunnableConfig` in `chainlit_app
 - [x] Bronze layer — external tables registered in Unity Catalog via Databricks UI
 - [x] Silver layer — `dim_customers`, `fct_orders`, `fct_orders_extended` (SQL + PySpark)
 - [x] Gold layer — `agg_customer_monthly_stats` (SQL + PySpark)
-- [x] Diamond layer — `sem_customer_transaction_summary`, `sem_regional_monthly_aov` (SQL + PySpark)
-- [x] Unity Catalog semantic model YAML (`semantic_model.yml`)
+- [x] Diamond layer — `vw_customer_orders_metrics`, a real Unity Catalog Metric View (`metric_views/customer_orders_metric_view.yml`, deployed via `metric_views/deploy_metric_view.py`)
 - [x] MCP query functions (`databricks_query.py`)
 - [x] GitHub repo connected to Databricks; all pipeline files pushed
 - [x] **MCP Server** — FastMCP with 3 tools (typed queries + text2SQL)
@@ -144,7 +154,7 @@ Each `graph.ainvoke()` call is one root trace. `RunnableConfig` in `chainlit_app
 
 ## Remaining / Future
 
-- [ ] **AI/BI Genie** — Register `semantic_model.yml` in Unity Catalog; demo natural language querying directly in Databricks
+- [ ] **AI/BI Genie** — Add `demo.diamond.vw_customer_orders_metrics` to a Genie space; demo natural language querying directly in Databricks
 - [ ] **Judge span visibility** — Optionally add `run_name` to Judge's `llm.ainvoke()` config for clearer LangSmith labelling
 
 ---
@@ -203,6 +213,7 @@ unsafe_allow_html = true                     # required for inline HTML in chain
 ## Notes for Claude
 
 - The DLT pipeline files (`sql_dlt.sql`, `pyspark_dlt.py`) are synced to GitHub and pulled into Databricks via Git integration. After editing, always push to GitHub so Databricks picks up the changes.
+- The Diamond-layer semantic object is a Metric View, not a DLT table — changes to its YAML must be deployed by rerunning `python metric_views/deploy_metric_view.py` against the SQL warehouse; it will NOT pick up changes via the Databricks Git-integration + DLT pipeline refresh flow used for Bronze/Silver/Gold.
 - The `demo.bronze` tables are **not** created by DLT — they are manually registered in the Databricks UI as external tables pointing to CSV files. This is intentional to demo the ingestion step.
 - Both SQL and PySpark versions of the pipeline are maintained in parallel; keep them in sync when making changes.
 - Default repo: `Paul60209/databricks_demo`, branch: `main`

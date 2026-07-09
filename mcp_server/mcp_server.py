@@ -2,8 +2,8 @@
 MCP Server — Databricks Demo
 =============================
 Exposes three tools over stdio (FastMCP):
-  1. get_customer_transaction_summary  — typed query on demo.diamond
-  2. get_regional_monthly_aov          — typed query on demo.diamond
+  1. get_customer_transaction_summary  — typed query on the Diamond semantic layer
+  2. get_regional_monthly_aov          — typed query on the Diamond semantic layer
   3. query_data_with_natural_language  — text2SQL via Claude → Databricks
 
 Environment variables required:
@@ -53,19 +53,38 @@ demo.golden.agg_customer_monthly_stats
     country VARCHAR, customer_id VARCHAR, customer_name VARCHAR,
     total_order_count BIGINT, total_order_amount DOUBLE
 
-=== Diamond layer (prefer these — pre-aggregated semantic tables) ===
-demo.diamond.sem_customer_transaction_summary
-    customer_id VARCHAR, customer_name VARCHAR, country VARCHAR,
-    order_month TIMESTAMP, total_order_count BIGINT,
-    total_order_amount DOUBLE, avg_order_value DOUBLE
+=== Semantic layer (Unity Catalog Metric View — prefer this for aggregate questions) ===
+demo.diamond.vw_customer_orders_metrics   (a METRIC VIEW, not a plain table)
+    Fields (usable in SELECT / WHERE / GROUP BY, like normal columns):
+        customer_id VARCHAR, customer_name VARCHAR,
+        country VARCHAR (values: Taiwan, Japan, United States, Unknown),
+        order_month TIMESTAMP (first day of month, e.g. 2025-01-01)
+    Measures (MUST be wrapped in MEASURE(...) — never SUM()/COUNT() directly):
+        total_order_count, total_order_amount,
+        avg_order_value  -- already correctly weighted at any grouping grain
 
-demo.diamond.sem_regional_monthly_aov
-    country VARCHAR, order_month TIMESTAMP,
-    total_order_count BIGINT, total_order_amount DOUBLE, aov DOUBLE
+    CORRECT example:
+        SELECT country, MEASURE(total_order_count), MEASURE(total_order_amount)
+        FROM demo.diamond.vw_customer_orders_metrics
+        WHERE country = 'Taiwan'
+        GROUP BY country;
+
+    INCORRECT (do not do this):
+        SELECT country, SUM(total_order_amount)             -- wrong: raw SUM on a measure
+        FROM demo.diamond.vw_customer_orders_metrics GROUP BY country;
+        SELECT * FROM demo.diamond.vw_customer_orders_metrics;  -- wrong: SELECT * unsupported
+
+    Rules specific to this object:
+    - Every measure reference in SELECT must be wrapped in MEASURE(...).
+    - SELECT * is not supported; list fields/measures explicitly.
+    - GROUP BY only fields (never measures).
+    - Cannot be joined directly to other tables in the same query; wrap in a
+      CTE first if a join is unavoidable.
 
 Rules:
 - DO NOT query demo.bronze tables.
-- Prefer Diamond layer; use Silver/Gold only when Diamond lacks needed granularity.
+- Prefer the semantic layer (metric view); use Silver/Gold only when it lacks
+  needed granularity.
 - order_month is a TIMESTAMP (first day of the month).
 - To filter by month string use: DATE_FORMAT(order_month, 'yyyy-MM') = '2025-01'
 - Use standard Databricks SQL (Spark SQL dialect).
@@ -128,7 +147,7 @@ def get_customer_transaction_summary(
     months: list[str] | None = None,
 ) -> str:
     """
-    Query per-customer monthly transaction stats from the Diamond layer.
+    Query per-customer monthly transaction stats from the semantic layer.
 
     Args:
         customer_ids:   Filter by customer ID list, e.g. ["C001", "C002"]. Optional.
@@ -158,7 +177,7 @@ def get_regional_monthly_aov(
     months: list[str] | None = None,
 ) -> str:
     """
-    Query Average Order Value (AOV) by region and month from the Diamond layer.
+    Query Average Order Value (AOV) by region and month from the semantic layer.
 
     Args:
         countries: Filter by country list, e.g. ["Taiwan", "Japan"]. Optional.

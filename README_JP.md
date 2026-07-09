@@ -19,16 +19,16 @@ Chainlit のチャット UI から自然言語で質問すると、LangGraph マ
 
 ## セマンティックレイヤー
 
-**場所：** `sql_dlt.sql` / `pyspark_dlt.py` · `semantic_model.yml`
+**場所：** `sql_dlt.sql` / `pyspark_dlt.py` · `metric_views/customer_orders_metric_view.yml`
 
-**Delta Live Tables (DLT)** で構築し、**Unity Catalog** が管理する 4 層の Lakehouse データパイプラインです。
+**Delta Live Tables (DLT)** で構築し、**Unity Catalog** が管理する Lakehouse データパイプラインです。最上位にはネイティブの **Unity Catalog Metric View** をセマンティックレイヤーとして重ねています。
 
 ```
 生データ CSV
   └─► Bronze   (demo.bronze)     — 外部テーブル（Databricks UI から取り込み）
         └─► Silver  (demo.silver)    — DLT：クレンジング・重複排除・バリデーション
               └─► Gold    (demo.golden)   — DLT：月次集計
-                    └─► Diamond (demo.diamond)  — AI 向けセマンティックテーブル
+                    └─► Diamond (demo.diamond)  — Unity Catalog Metric View（DLT 管理外）
 ```
 
 | レイヤー | テーブル | 役割 |
@@ -37,10 +37,9 @@ Chainlit のチャット UI から自然言語で質問すると、LangGraph マ
 | Silver | `fct_orders` | 日付形式の統一・無効金額の除去 |
 | Silver | `fct_orders_extended` | 注文テーブルと顧客テーブルのストリーム-スタティック Join |
 | Gold | `agg_customer_monthly_stats` | 顧客ごとの月次注文数・売上集計 |
-| Diamond | `sem_customer_transaction_summary` | 顧客ごとの月次統計（AOV・注文数・金額） |
-| Diamond | `sem_regional_monthly_aov` | 国別・月別の平均注文金額（AOV） |
+| Diamond | `vw_customer_orders_metrics` | Metric View：注文数・売上・AOV — 1つのオブジェクトで顧客別・地域別の両方に対応 |
 
-`semantic_model.yml` は Diamond レイヤー上にビジネス向けのメトリクスおよびディメンション定義を登録し、**Databricks AI/BI Genie** による自然言語クエリを可能にします。
+`metric_views/customer_orders_metric_view.yml` は真の Unity Catalog Metric View（`CREATE VIEW ... WITH METRICS LANGUAGE YAML`）としてビジネス向けの指標とフィールドを定義し、`metric_views/deploy_metric_view.py` でデプロイします。これにより **Databricks AI/BI Genie** による自然言語クエリが可能になります。
 
 ---
 

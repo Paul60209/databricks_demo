@@ -1,7 +1,8 @@
 """
 Databricks Query Functions
 ==========================
-Two semantic query functions over the diamond layer (demo.diamond.*).
+Two semantic query functions over the Diamond layer Unity Catalog Metric View
+(demo.diamond.vw_customer_orders_metrics), queried via MEASURE(...) + GROUP BY.
 Designed to be registered as MCP server tools for AI agent consumption.
 
 Dependencies:
@@ -111,10 +112,10 @@ def get_customer_transaction_summary(
             customer_name,
             country,
             {select_month},
-            SUM(total_order_count)                                      AS total_order_count,
-            ROUND(SUM(total_order_amount), 2)                           AS total_order_amount,
-            ROUND(SUM(total_order_amount) / SUM(total_order_count), 2)  AS avg_order_value
-        FROM demo.diamond.sem_customer_transaction_summary
+            MEASURE(total_order_count)                    AS total_order_count,
+            ROUND(MEASURE(total_order_amount), 2)          AS total_order_amount,
+            ROUND(MEASURE(avg_order_value), 2)             AS avg_order_value
+        FROM demo.diamond.vw_customer_orders_metrics
         {where_sql}
         GROUP BY customer_id, customer_name, country{group_month}
         ORDER BY total_order_amount DESC
@@ -167,10 +168,10 @@ def get_regional_monthly_aov(
         SELECT
             country,
             DATE_FORMAT(order_month, 'yyyy-MM') AS order_month,
-            SUM(total_order_count)                                      AS total_order_count,
-            ROUND(SUM(total_order_amount), 2)                           AS total_order_amount,
-            ROUND(SUM(total_order_amount) / SUM(total_order_count), 2)  AS aov
-        FROM demo.diamond.sem_regional_monthly_aov
+            MEASURE(total_order_count)              AS total_order_count,
+            ROUND(MEASURE(total_order_amount), 2)   AS total_order_amount,
+            ROUND(MEASURE(avg_order_value), 2)      AS aov
+        FROM demo.diamond.vw_customer_orders_metrics
         {where_sql}
         GROUP BY country, DATE_FORMAT(order_month, 'yyyy-MM')
         ORDER BY country, order_month
