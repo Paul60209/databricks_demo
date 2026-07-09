@@ -19,16 +19,16 @@ Natural language queries flow from a Chainlit chat UI through a LangGraph multi-
 
 ## Semantic Layer
 
-**Location:** `sql_dlt.sql` / `pyspark_dlt.py` · `semantic_model.yml`
+**Location:** `sql_dlt.sql` / `pyspark_dlt.py` · `metric_views/customer_orders_metric_view.yml`
 
-A four-layer Lakehouse pipeline built with **Delta Live Tables (DLT)** and managed by **Unity Catalog**.
+A Lakehouse pipeline built with **Delta Live Tables (DLT)** and managed by **Unity Catalog**, topped with a native **Unity Catalog Metric View** as the semantic layer.
 
 ```
 Raw CSV
   └─► Bronze   (demo.bronze)     — external tables, ingested via Databricks UI
         └─► Silver  (demo.silver)    — DLT: clean, deduplicate, validate
               └─► Gold    (demo.golden)   — DLT: monthly aggregation
-                    └─► Diamond (demo.diamond)  — semantic tables for AI consumption
+                    └─► Diamond (demo.diamond)  — Unity Catalog Metric View (not DLT-managed)
 ```
 
 | Layer | Table | Role |
@@ -37,10 +37,9 @@ Raw CSV
 | Silver | `fct_orders` | Date format unification, drop invalid amounts |
 | Silver | `fct_orders_extended` | Stream-static join of orders + customers |
 | Gold | `agg_customer_monthly_stats` | Monthly revenue & order count per customer |
-| Diamond | `sem_customer_transaction_summary` | Per-customer monthly stats (AOV, count, amount) |
-| Diamond | `sem_regional_monthly_aov` | AOV by country and month |
+| Diamond | `vw_customer_orders_metrics` | Metric View: order count, revenue, and AOV — one object serves both per-customer and regional slices |
 
-`semantic_model.yml` registers business-friendly metric and dimension descriptions over the Diamond layer, enabling **Databricks AI/BI Genie** to answer natural language questions directly.
+`metric_views/customer_orders_metric_view.yml` defines business-friendly measures and fields as a real Unity Catalog Metric View (`CREATE VIEW ... WITH METRICS LANGUAGE YAML`), deployed via `metric_views/deploy_metric_view.py`, enabling **Databricks AI/BI Genie** to answer natural language questions directly.
 
 ---
 

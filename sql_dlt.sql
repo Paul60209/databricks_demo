@@ -97,45 +97,10 @@ AS SELECT
   SUM(amount) AS total_order_amount
 FROM live.fct_orders_extended
 GROUP BY 1, 2, 3, 4;
- 
- 
+
+
 -- =====================================================================
--- 7. DIAMOND LAYER: sem_customer_transaction_summary (Semantic: Customer Transactions)
--- Business Logic: Expose customer-level monthly transaction stats as a clean semantic surface.
--- Supports filtering by customer_id, customer_name, or order_month in the query layer.
--- Note: Reads from gold aggregation; declared as LIVE TABLE for full materialization.
--- Note: agg_customer_monthly_stats lives in schema "golden", which is NOT this pipeline's
---       default schema ("silver"), so it must be referenced with its full 3-level name
---       instead of the live. prefix.
+-- The Diamond layer (semantic layer) is no longer managed by this DLT
+-- pipeline. It's a Unity Catalog Metric View, deployed independently via
+-- metric_views/deploy_metric_view.py — see CLAUDE.md for details.
 -- =====================================================================
-CREATE OR REFRESH LIVE TABLE demo.diamond.sem_customer_transaction_summary
-COMMENT "Semantic table exposing per-customer monthly transaction count and revenue for downstream query and AI agent consumption"
-AS SELECT
-  customer_id,
-  customer_name,
-  country,
-  order_month,
-  total_order_count,
-  total_order_amount,
-  ROUND(total_order_amount / total_order_count, 2) AS avg_order_value
-FROM demo.golden.agg_customer_monthly_stats;
- 
- 
--- =====================================================================
--- 8. DIAMOND LAYER: sem_regional_monthly_aov (Semantic: Regional AOV)
--- Business Logic: Aggregate to country + month level and compute AOV (Average Order Value).
--- Supports filtering by country or order_month in the query layer.
--- Note: Reads from gold aggregation; declared as LIVE TABLE for full materialization.
--- Note: same cross-schema situation as above - use full 3-level name, not live. prefix.
--- =====================================================================
-CREATE OR REFRESH LIVE TABLE demo.diamond.sem_regional_monthly_aov
-COMMENT "Semantic table exposing regional monthly AOV (Average Order Value) for downstream query and AI agent consumption"
-AS SELECT
-  country,
-  order_month,
-  SUM(total_order_count)                                      AS total_order_count,
-  ROUND(SUM(total_order_amount), 2)                           AS total_order_amount,
-  ROUND(SUM(total_order_amount) / SUM(total_order_count), 2) AS aov
-FROM demo.golden.agg_customer_monthly_stats
-GROUP BY country, order_month;
- 

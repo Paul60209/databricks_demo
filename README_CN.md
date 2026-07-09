@@ -19,16 +19,16 @@
 
 ## 語意層 (Semantic Layer)
 
-**位置：** `sql_dlt.sql` / `pyspark_dlt.py` · `semantic_model.yml`
+**位置：** `sql_dlt.sql` / `pyspark_dlt.py` · `metric_views/customer_orders_metric_view.yml`
 
-以 **Delta Live Tables (DLT)** 構建、由 **Unity Catalog** 管理的四層 Lakehouse 資料管道。
+以 **Delta Live Tables (DLT)** 構建、由 **Unity Catalog** 管理的 Lakehouse 資料管道，最上層再疊加原生的 **Unity Catalog Metric View** 作為語意層。
 
 ```
 原始 CSV
   └─► Bronze   (demo.bronze)     — 外部資料表，透過 Databricks UI 匯入
         └─► Silver  (demo.silver)    — DLT：清洗、去重、驗證
               └─► Gold    (demo.golden)   — DLT：月度聚合
-                    └─► Diamond (demo.diamond)  — 供 AI 使用的語意資料表
+                    └─► Diamond (demo.diamond)  — Unity Catalog Metric View（非 DLT 管理）
 ```
 
 | 層級 | 資料表 | 功能說明 |
@@ -37,10 +37,9 @@
 | Silver | `fct_orders` | 日期格式統一、過濾無效金額 |
 | Silver | `fct_orders_extended` | 訂單與客戶的串流-靜態 Join |
 | Gold | `agg_customer_monthly_stats` | 每位客戶的月度訂單數與營收 |
-| Diamond | `sem_customer_transaction_summary` | 每位客戶的月度統計（AOV、訂單數、金額） |
-| Diamond | `sem_regional_monthly_aov` | 各國各月份的平均訂單金額（AOV） |
+| Diamond | `vw_customer_orders_metrics` | Metric View：訂單數、營收、AOV — 同一個物件同時支援客戶層級與地區層級的查詢 |
 
-`semantic_model.yml` 在 Diamond 層之上定義業務友好的指標與維度說明，讓 **Databricks AI/BI Genie** 能直接以自然語言回答問題。
+`metric_views/customer_orders_metric_view.yml` 以真正的 Unity Catalog Metric View（`CREATE VIEW ... WITH METRICS LANGUAGE YAML`）定義業務友好的指標與維度，透過 `metric_views/deploy_metric_view.py` 部署，讓 **Databricks AI/BI Genie** 能直接以自然語言回答問題。
 
 ---
 
